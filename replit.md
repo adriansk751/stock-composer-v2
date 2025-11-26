@@ -60,8 +60,8 @@ Preferred communication style: Simple, everyday language.
 - **Rationale**: Daily sales velocity is the most accurate predictor for variable demand patterns
 
 **Multi-source Data Integration**:
-- **Current Stock**: Retrieved from SmartBill API
-- **Sales History**: Retrieved from either easySales or SmartBill
+- **Current Stock**: Always from SmartBill API, specifically from warehouse "gestiune StocCV" (default, configurable)
+- **Sales History**: User's choice - either easySales OR SmartBill
 - **Incoming Inventory**: Retrieved from Google Sheets
 - **Rationale**: Combines operational data from multiple systems of record to provide complete inventory picture
 

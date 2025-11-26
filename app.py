@@ -44,10 +44,12 @@ st.markdown("Calculate purchasing requirements based on sales velocity and curre
 
 st.sidebar.header("Configuration")
 
+st.sidebar.markdown("**Stock Source:** SmartBill (gestiune StocCV)")
+
 data_source = st.sidebar.radio(
     "Sales Data Source",
     ["easySales", "SmartBill"],
-    help="Select the source for sales data"
+    help="Select the source for sales/orders data. Stock is always from SmartBill."
 )
 
 st.sidebar.subheader("Date Range")
@@ -94,8 +96,9 @@ forecast_months = st.sidebar.multiselect(
 )
 
 warehouse_name = st.sidebar.text_input(
-    "Warehouse Name (optional)",
-    help="Filter stock by warehouse name"
+    "SmartBill Warehouse (gestiune)",
+    value="StocCV",
+    help="Warehouse name for stock data from SmartBill. Default: StocCV"
 )
 
 min_daily_sales = st.sidebar.number_input(
