@@ -11,23 +11,27 @@ class InventoryForecast:
         9: 270
     }
     
+    DEFAULT_SAFETY_STOCK_PERCENTAGE = 20
+    
     @staticmethod
     def calculate_requirements(
         stock_data: Dict[str, Dict],
         sales_data: Dict[str, Dict],
         incoming_data: Dict[str, float],
-        forecast_months: List[int] = [3, 4, 5, 6, 9]
+        forecast_months: List[int] = [3, 4, 5, 6, 9],
+        safety_stock_percentage: float = 0
     ) -> pd.DataFrame:
         """
         Calculate inventory requirements for each SKU across multiple time horizons.
         
-        Formula: Required = (Daily Sales × Days Needed) - Current Stock + Incoming
+        Formula: Required = (Daily Sales × Days Needed × (1 + Safety%)) - Current Stock + Incoming
         
         Args:
             stock_data: Dictionary mapping SKU to stock information
             sales_data: Dictionary mapping SKU to sales metrics
             incoming_data: Dictionary mapping SKU to incoming quantities
             forecast_months: List of months to forecast (default: [3, 4, 5, 6, 9])
+            safety_stock_percentage: Additional buffer percentage (0-100)
         
         Returns:
             DataFrame with forecast results
@@ -47,6 +51,8 @@ class InventoryForecast:
             product_name = stock_info.get("name") or sales_info.get("name", "Unknown")
             unit = stock_info.get("unit", "buc")
             
+            safety_multiplier = 1 + (safety_stock_percentage / 100)
+            
             row = {
                 "SKU": sku,
                 "Product Name": product_name,
@@ -54,12 +60,14 @@ class InventoryForecast:
                 "Current Stock": round(current_stock, 2),
                 "Incoming": round(incoming, 2),
                 "Daily Sales": round(daily_sales, 4),
+                "Safety Stock %": safety_stock_percentage,
             }
             
             for months in forecast_months:
                 days = InventoryForecast.MONTHS_TO_DAYS.get(months, months * 30)
                 
-                required = (daily_sales * days) - current_stock + incoming
+                demand = daily_sales * days * safety_multiplier
+                required = demand - current_stock + incoming
                 
                 row[f"Required {months}M"] = round(required, 2)
             

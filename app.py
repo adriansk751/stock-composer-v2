@@ -8,8 +8,28 @@ from smartbill_api import get_smartbill_client
 from easysales_api import get_easysales_client
 from sheets_api import get_sheets_client
 from forecast import InventoryForecast
+from alerts import get_alert_system
 
 load_dotenv()
+
+DB_AVAILABLE = False
+save_forecast_run = None
+save_forecast_details = None
+get_forecast_history = None
+get_forecast_details = None
+get_sku_history = None
+
+if all([os.getenv("PGHOST"), os.getenv("PGDATABASE"), os.getenv("PGUSER")]):
+    try:
+        from database import (
+            init_database, save_forecast_run, save_forecast_details,
+            get_forecast_history, get_forecast_details, get_sku_history
+        )
+        init_database()
+        DB_AVAILABLE = True
+    except Exception as e:
+        DB_AVAILABLE = False
+        print(f"Database not available: {e}")
 
 st.set_page_config(
     page_title="Inventory Forecast System",
@@ -82,6 +102,18 @@ min_daily_sales = st.sidebar.number_input(
     value=0.01,
     step=0.01,
     help="Only show products with daily sales above this threshold"
+)
+
+st.sidebar.markdown("---")
+st.sidebar.header("Safety Stock Settings")
+
+safety_stock_percentage = st.sidebar.slider(
+    "Safety Stock Buffer (%)",
+    min_value=0,
+    max_value=100,
+    value=20,
+    step=5,
+    help="Additional buffer percentage to add to forecast requirements"
 )
 
 st.sidebar.markdown("---")
@@ -192,14 +224,43 @@ if st.sidebar.button("🔄 Run Forecast", type="primary", use_container_width=Tr
                 stock_data=stock_data,
                 sales_data=sales_data,
                 incoming_data=incoming_data,
-                forecast_months=forecast_months
+                forecast_months=forecast_months,
+                safety_stock_percentage=safety_stock_percentage
             )
         
         df_filtered = InventoryForecast.filter_active_products(df_forecast, min_daily_sales)
         
+        if DB_AVAILABLE:
+            with st.spinner("Saving forecast to database..."):
+                try:
+                    run_id = save_forecast_run(
+                        data_source=data_source,
+                        start_date=start_date_str,
+                        end_date=end_date_str,
+                        days_analyzed=days_interval,
+                        warehouse_name=warehouse_name or None,
+                        total_products=len(df_forecast),
+                        notes=f"Safety stock: {safety_stock_percentage}%"
+                    )
+                    
+                    forecast_records = df_forecast.to_dict('records')
+                    save_forecast_details(run_id, forecast_records)
+                    
+                    st.success(f"✓ Forecast saved to database (Run ID: {run_id})")
+                    st.session_state['last_run_id'] = run_id
+                except Exception as e:
+                    st.warning(f"Could not save to database: {e}")
+        
         st.session_state['forecast_data'] = df_filtered
         st.session_state['full_forecast_data'] = df_forecast
         st.session_state['last_update'] = datetime.now()
+        st.session_state['current_config'] = {
+            'data_source': data_source,
+            'start_date': start_date_str,
+            'end_date': end_date_str,
+            'days_interval': days_interval,
+            'safety_stock': safety_stock_percentage
+        }
 
 if 'forecast_data' in st.session_state:
     df = st.session_state['forecast_data']
@@ -220,7 +281,7 @@ if 'forecast_data' in st.session_state:
     
     st.markdown("---")
     
-    tab1, tab2, tab3 = st.tabs(["📊 Full Forecast", "🔴 Critical Items", "📈 Statistics"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📊 Full Forecast", "🔴 Critical Items", "📈 Statistics", "📜 History & Trends"])
     
     with tab1:
         st.subheader("Complete Forecast Results")
@@ -270,6 +331,31 @@ if 'forecast_data' in st.session_state:
                     file_name=f"critical_items_{critical_horizon}m_{datetime.now().strftime('%Y%m%d')}.csv",
                     mime="text/csv"
                 )
+                
+                st.markdown("---")
+                st.markdown("#### 📧 Email Alert")
+                
+                alert_system = get_alert_system()
+                if alert_system:
+                    email_recipients = st.text_input(
+                        "Email Recipients (comma-separated)",
+                        help="Enter email addresses to send low stock alerts"
+                    )
+                    
+                    if st.button("Send Alert Email") and email_recipients:
+                        recipients = [email.strip() for email in email_recipients.split(',')]
+                        success = alert_system.send_low_stock_alert(
+                            to_emails=recipients,
+                            critical_items=df_critical,
+                            forecast_horizon_months=critical_horizon
+                        )
+                        
+                        if success:
+                            st.success(f"✓ Alert sent to {len(recipients)} recipient(s)")
+                        else:
+                            st.error("Failed to send alert. Check SMTP configuration.")
+                else:
+                    st.info("Email alerts not configured. Set SMTP_SERVER, SMTP_PORT, SMTP_USER, and SMTP_PASSWORD in environment variables.")
             else:
                 st.success(f"✓ All items have sufficient stock for {critical_horizon} months")
     
@@ -294,6 +380,73 @@ if 'forecast_data' in st.session_state:
         
         st.markdown("**Daily Sales Distribution**")
         st.bar_chart(df.set_index('SKU')['Daily Sales'].head(20))
+    
+    with tab4:
+        st.subheader("Historical Trends & Forecast Accuracy")
+        
+        if not DB_AVAILABLE:
+            st.info("📊 Historical tracking requires database configuration. Set up PostgreSQL credentials to enable this feature.")
+            st.markdown("""
+            **Required Environment Variables:**
+            - `PGHOST` - PostgreSQL host
+            - `PGDATABASE` - Database name
+            - `PGUSER` - Database user
+            - `PGPASSWORD` - Database password
+            - `PGPORT` - Database port
+            """)
+        else:
+            try:
+                history = get_forecast_history(limit=20) if get_forecast_history else []
+            
+            if history:
+                st.markdown("#### Recent Forecast Runs")
+                
+                history_df = pd.DataFrame(history)
+                history_df['run_date'] = pd.to_datetime(history_df['run_date']).dt.strftime('%Y-%m-%d %H:%M')
+                
+                st.dataframe(
+                    history_df[['id', 'run_date', 'data_source', 'start_date', 'end_date', 'days_analyzed', 'warehouse_name', 'total_products']],
+                    use_container_width=True,
+                    height=300
+                )
+                
+                st.markdown("---")
+                st.markdown("#### SKU Historical Analysis")
+                
+                sku_to_analyze = st.selectbox(
+                    "Select SKU to view history",
+                    options=df['SKU'].tolist() if not df.empty else [],
+                    help="View historical forecast data for a specific SKU"
+                )
+                
+                if sku_to_analyze and get_sku_history:
+                    sku_history = get_sku_history(sku_to_analyze, limit=15)
+                    
+                    if sku_history:
+                        sku_df = pd.DataFrame(sku_history)
+                        sku_df['run_date'] = pd.to_datetime(sku_df['run_date']).dt.strftime('%Y-%m-%d')
+                        
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.markdown("**Stock & Sales Trends**")
+                            chart_data = sku_df[['run_date', 'current_stock', 'daily_sales']].set_index('run_date')
+                            st.line_chart(chart_data)
+                        
+                        with col2:
+                            st.markdown("**Requirement Trends (3M)**")
+                            req_chart = sku_df[['run_date', 'required_3m']].set_index('run_date')
+                            st.line_chart(req_chart)
+                        
+                        st.markdown("**Historical Data**")
+                        st.dataframe(sku_df, use_container_width=True)
+                    else:
+                        st.info(f"No historical data found for SKU: {sku_to_analyze}")
+                else:
+                    st.info("No forecast history available yet. Run a forecast to start tracking data.")
+            
+            except Exception as e:
+                st.error(f"Error loading historical data: {e}")
 
 else:
     st.info("👈 Configure settings in the sidebar and click 'Run Forecast' to begin")
