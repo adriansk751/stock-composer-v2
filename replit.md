@@ -26,7 +26,7 @@ Preferred communication style: Simple, everyday language.
 
 **Core Calculation Engine** (forecast.py)
 - **InventoryForecast class**: Implements the core business logic for calculating inventory requirements
-- **Formula**: `Required = (Daily Sales × Days Needed × (1 + Safety%)) - Current Stock + Incoming`
+- **Formula**: `Required = (Daily Sales × Days Needed × (1 + Safety%)) - Current Stock - Incoming`
 - **Time horizons**: Supports multiple forecast periods (3, 4, 5, 6, 9 months) mapped to days (90, 120, 150, 180, 270)
 - **Rationale**: Centralized calculation logic ensures consistency across all warehouse comparisons and forecast runs
 

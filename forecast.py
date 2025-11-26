@@ -24,7 +24,7 @@ class InventoryForecast:
         """
         Calculate inventory requirements for each SKU across multiple time horizons.
         
-        Formula: Required = (Daily Sales × Days Needed × (1 + Safety%)) - Current Stock + Incoming
+        Formula: Required = (Daily Sales × Days Needed × (1 + Safety%)) - Current Stock - Incoming
         
         Args:
             stock_data: Dictionary mapping SKU to stock information
@@ -67,7 +67,7 @@ class InventoryForecast:
                 days = InventoryForecast.MONTHS_TO_DAYS.get(months, months * 30)
                 
                 demand = daily_sales * days * safety_multiplier
-                required = demand - current_stock + incoming
+                required = demand - current_stock - incoming
                 
                 row[f"Required {months}M"] = round(required, 2)
             

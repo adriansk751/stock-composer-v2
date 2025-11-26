@@ -476,10 +476,12 @@ else:
     
     3. **Forecast Formula**:
        ```
-       Required = (Daily Sales × Days Needed) - Current Stock + Incoming
+       Required = (Daily Sales × Days Needed × Safety Multiplier) - Current Stock - Incoming
        ```
        
        Where:
        - Daily Sales = Total Sold / Analysis Period Days
        - Days Needed = Forecast Months × 30
+       - Safety Multiplier = 1 + (Safety Stock % / 100)
+       - Negative result = You have enough stock (surplus)
     """)
