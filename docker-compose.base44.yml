@@ -1,0 +1,48 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.base44
+    restart: on-failure
+    ports:
+      - "3000:8501"
+    volumes:
+      - .:/app
+    environment:
+      - PGHOST=postgres
+      - PGPORT=5432
+      - PGDATABASE=forecast
+      - PGUSER=forecast
+      - PGPASSWORD=forecast
+      - BASE44_PUBLIC_HOST_SUFFIX=${BASE44_PUBLIC_HOST_SUFFIX:-}
+    env_file:
+      - /run/base44/app.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["sh", "-ec", "uv sync --frozen && exec uv run streamlit run app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8501/_stcore/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  postgres:
+    image: postgres:16
+    restart: on-failure
+    environment:
+      POSTGRES_DB: forecast
+      POSTGRES_USER: forecast
+      POSTGRES_PASSWORD: forecast
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forecast -d forecast"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  pgdata:

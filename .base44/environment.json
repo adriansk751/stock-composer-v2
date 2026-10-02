@@ -1,0 +1,18 @@
+{
+  "previewPort": 3000,
+  "healthPath": "/_stcore/health",
+  "startCommand": "docker compose -f docker-compose.base44.yml up -d",
+  "secrets": [
+    {"name": "SMARTBILL_EMAIL", "description": "SmartBill account email (https://ws.smartbill.ro)", "requiredAtBoot": false},
+    {"name": "SMARTBILL_TOKEN", "description": "SmartBill API token (from SmartBill account settings)", "requiredAtBoot": false},
+    {"name": "SMARTBILL_CIF", "description": "Company fiscal identification code (CIF) for SmartBill", "requiredAtBoot": false},
+    {"name": "EASYSALES_TOKEN", "description": "easySales API Bearer token (https://app.easysales.ro)", "requiredAtBoot": false},
+    {"name": "GOOGLE_CREDENTIALS_JSON", "description": "Google service account JSON for Sheets API (as a string)", "requiredAtBoot": false},
+    {"name": "GOOGLE_SHEET_ID", "description": "Default Google Sheets spreadsheet ID", "requiredAtBoot": false},
+    {"name": "GOOGLE_WORKSHEET_NAME", "description": "Default Google Sheets worksheet name", "requiredAtBoot": false},
+    {"name": "SMTP_SERVER", "description": "SMTP server for email alerts (e.g. smtp.gmail.com)", "requiredAtBoot": false},
+    {"name": "SMTP_PORT", "description": "SMTP port (e.g. 587 for TLS)", "requiredAtBoot": false},
+    {"name": "SMTP_USER", "description": "SMTP username for email alerts", "requiredAtBoot": false},
+    {"name": "SMTP_PASSWORD", "description": "SMTP password/app-password for email alerts", "requiredAtBoot": false}
+  ]
+}
